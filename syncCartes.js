@@ -42,3 +42,13 @@ if (nouvellesCartes > 0) {
 } else {
   console.log('✔️ Aucune nouvelle carte trouvée.');
 }
+import { execSync } from 'child_process';
+
+try {
+  execSync('git add cartes.json cartes/*', { stdio: 'inherit' });
+  execSync('git commit -m "auto: ajout cartes"', { stdio: 'inherit' });
+  execSync('git push', { stdio: 'inherit' });
+  console.log('✅ cartes.json et images poussées sur GitHub');
+} catch (err) {
+  console.error('❌ Erreur push Git:', err.message);
+}
