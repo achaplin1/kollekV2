@@ -2,13 +2,13 @@
   {
     "id": 1,
     "name": "Mario",
-    "image": "https://raw.githubusercontent.com/achaplin1/kollek/main/cartes/mario.png",
+    "image": "/cartes/mario.png",
     "origin": "Mario"
   },
   {
     "id": 2,
     "name": "Naruto",
-    "image": "https://raw.githubusercontent.com/achaplin1/kollek/main/cartes/naruto.png",
+    "image": "/cartes/naruto.png",
     "origin": "Naruto"
   }
 ]

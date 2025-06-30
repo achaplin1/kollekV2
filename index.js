@@ -1,3 +1,5 @@
+
+import express from 'express';
 import { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } from 'discord.js';
 import dotenv from 'dotenv';
 import pkg from 'pg';
@@ -5,13 +7,16 @@ import pkg from 'pg';
 dotenv.config();
 const { Pool } = pkg;
 
+const app = express();
+app.use('/cartes', express.static('public/cartes'));
+
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
 
-const CLIENT_ID = 'TON_APPLICATION_ID_ICI'; // Remplace par ton Application ID
+const CLIENT_ID = 'TON_APPLICATION_ID_ICI';
 
 client.once('ready', async () => {
   console.log(`✅ Connecté en tant que ${client.user.tag}`);
@@ -39,13 +44,12 @@ client.on('interactionCreate', async interaction => {
   switch (interaction.commandName) {
     case 'booster2': {
       const result = await pool.query('SELECT * FROM cartes ORDER BY RANDOM() LIMIT 3');
-      const cartes = result.rows;
-      for (const carte of cartes) {
+      for (const carte of result.rows) {
         await interaction.followUp({
           embeds: [{
             title: carte.name,
             description: carte.origin,
-            image: { url: carte.image }
+            image: { url: `https://ton-projet.railway.app${carte.image}` }
           }]
         });
       }
@@ -59,7 +63,7 @@ client.on('interactionCreate', async interaction => {
         embeds: [{
           title: carte.name,
           description: carte.origin,
-          image: { url: carte.image }
+          image: { url: `https://ton-projet.railway.app${carte.image}` }
         }]
       });
       break;
@@ -72,7 +76,7 @@ client.on('interactionCreate', async interaction => {
         embeds: [{
           title: carte.name,
           description: carte.origin,
-          image: { url: carte.image }
+          image: { url: `https://ton-projet.railway.app${carte.image}` }
         }]
       });
       break;
@@ -80,11 +84,12 @@ client.on('interactionCreate', async interaction => {
 
     case 'kollek2': {
       const result = await pool.query('SELECT * FROM cartes ORDER BY id');
-      const message = result.rows.map(c => `• ${c.name} (${c.origin})`).join('\\n');
-      await interaction.reply({ content: `🃏 Ta collection :\\n${message}`.slice(0, 2000) });
+      const message = result.rows.map(c => `• ${c.name} (${c.origin})`).join('\n');
+      await interaction.reply({ content: `🃏 Ta collection :\n${message}`.slice(0, 2000) });
       break;
     }
   }
 });
 
 client.login(process.env.TOKEN);
+app.listen(3000, () => console.log('🌐 Serveur web actif sur le port 3000'));
