@@ -33,6 +33,7 @@ for (const carte of cartes) {
   });
 }
 
+// 👉 Remplace cet ID par ton vrai ID d'application Discord
 const CLIENT_ID = '1389215821947080766';
 
 client.once('ready', async () => {
@@ -57,6 +58,8 @@ client.once('ready', async () => {
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
+  const baseURL = 'https://comfortable-abundance-production.up.railway.app';
+
   switch (interaction.commandName) {
     case 'booster2': {
       db.all('SELECT * FROM cartes ORDER BY RANDOM() LIMIT 3', async (err, rows) => {
@@ -65,7 +68,7 @@ client.on('interactionCreate', async interaction => {
             embeds: [{
               title: carte.name,
               description: carte.origin,
-              image: { url: carte.image }
+              image: { url: baseURL + carte.image }
             }]
           });
         }
@@ -79,7 +82,7 @@ client.on('interactionCreate', async interaction => {
           embeds: [{
             title: carte.name,
             description: carte.origin,
-            image: { url: carte.image }
+            image: { url: baseURL + carte.image }
           }]
         });
       });
@@ -92,7 +95,7 @@ client.on('interactionCreate', async interaction => {
           embeds: [{
             title: carte.name,
             description: carte.origin,
-            image: { url: carte.image }
+            image: { url: baseURL + carte.image }
           }]
         });
       });
