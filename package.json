@@ -4,6 +4,7 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
+    "prestart": "node syncCartes.js",
     "start": "node index.js"
   },
   "dependencies": {
