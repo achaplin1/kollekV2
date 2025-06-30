@@ -8,9 +8,10 @@
     "start": "node index.js",
     "import": "node import_cartes.js"
   },
-  "dependencies": {
-    "discord.js": "^14.0.0",
-    "dotenv": "^16.0.0",
-    "pg": "^8.10.0"
-  }
+"dependencies": {
+  "discord.js": "^14.0.0",
+  "dotenv": "^16.0.0",
+  "pg": "^8.10.0",
+  "express": "^4.18.2"
+}
 }
