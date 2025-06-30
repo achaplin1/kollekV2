@@ -29,7 +29,6 @@ for (const fichier of fichiers) {
     cartes.push({
       name: nomSansExt.charAt(0).toUpperCase() + nomSansExt.slice(1),
       image: chemin,
-      origin: "Inconnu"
     });
     nouvellesCartes++;
   }
