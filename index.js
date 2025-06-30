@@ -1,7 +1,10 @@
 
-const { Client, GatewayIntentBits } = require('discord.js');
-const { Pool } = require('pg');
-require('dotenv').config();
+import { Client, GatewayIntentBits } from 'discord.js';
+import dotenv from 'dotenv';
+import pkg from 'pg';
+const { Pool } = pkg;
+
+dotenv.config();
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const pool = new Pool({
