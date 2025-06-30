@@ -11,14 +11,14 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const db = new sqlite3.Database('./database.db');
 
 // Créer la table si elle n'existe pas
-db.run(\`
+db.run(`
   CREATE TABLE IF NOT EXISTS cartes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     image TEXT NOT NULL,
     origin TEXT
   )
-\`);
+`);
 
 // Charger les cartes depuis le JSON et les ajouter si absentes
 const cartes = JSON.parse(fs.readFileSync('./cartes.json', 'utf-8'));
