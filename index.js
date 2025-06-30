@@ -1,6 +1,8 @@
+
 import { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } from 'discord.js';
 import sqlite3 from 'sqlite3';
 import fs from 'fs';
+import express from 'express';
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
@@ -27,7 +29,14 @@ for (const carte of cartes) {
   });
 }
 
-const CLIENT_ID = '1389215821947080766'; // Remplace par ton vrai App ID
+// ➕ Partie Express pour servir /cartes/
+const app = express();
+app.use('/cartes', express.static('cartes'));
+app.listen(process.env.PORT || 3000, () => {
+  console.log('✅ Serveur Express pour les images lancé');
+});
+
+const CLIENT_ID = '1389215821947080766';
 const baseURL = 'https://comfortable-abundance-production.up.railway.app';
 
 client.once('ready', async () => {
@@ -96,12 +105,12 @@ client.on('interactionCreate', async interaction => {
 
     case 'kollek2': {
       db.all('SELECT * FROM cartes', async (err, rows) => {
-        const message = rows.map(c => `• ${c.name} (${c.origin})`).join('\\n');
-        await interaction.reply({ content: `🃏 Ta collection :\\n${message}`.slice(0, 2000) });
+        const message = rows.map(c => `• ${c.name} (${c.origin})`).join('\n');
+        await interaction.reply({ content: `🃏 Ta collection :\n${message}`.slice(0, 2000) });
       });
       break;
     }
   }
 });
 
-client.login(process.env.TOKEN); // Railway ➜ variable TOKEN
+client.login(process.env.TOKEN);
