@@ -1,16 +1,12 @@
-
 {
-  "name": "kollek-bot",
-  "version": "1.0.0",
-  "main": "index.js",
   "type": "module",
+  "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "import": "node import_cartes.js"
+    "start": "node index.js"
   },
   "dependencies": {
     "discord.js": "^14.0.0",
     "dotenv": "^16.0.0",
-    "sqlite3": "^5.1.0"
+    "sqlite3": "^5.1.6"
   }
 }
