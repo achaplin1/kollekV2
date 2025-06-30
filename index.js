@@ -33,7 +33,7 @@ for (const carte of cartes) {
   });
 }
 
-const CLIENT_ID = 'TON_APPLICATION_ID_ICI';
+const CLIENT_ID = '1389215821947080766';
 
 client.once('ready', async () => {
   console.log(`✅ Connecté en tant que ${client.user.tag}`);
