@@ -33,7 +33,7 @@ client.once('ready', async () => {
   await rest.put(Routes.applicationCommands(appId), {
     body: [
       new SlashCommandBuilder().setName('dé2').setDescription('Lance un dé à 6 faces (et gagne des koins)'),
-      new SlashCommandBuilder().setName('bonus2').setDescription('Réclame ton bonus quotidien (5 koins)')
+      new SlashCommandBuilder().setName('bonus2').setDescription('Réclame ton bonus quotidien (5 koins)'),
       new SlashCommandBuilder().setName('pioche2').setDescription('Tire une carte (pas de rareté)'),
       new SlashCommandBuilder().setName('booster2').setDescription('Booster de 3 cartes (15 koins, sans pièces pour doublons)'),
       new SlashCommandBuilder().setName('kollek2').setDescription('Voir ta collection (v2 sans raretés)')
@@ -49,13 +49,60 @@ client.once('ready', async () => {
 
 client.on('interactionCreate', async (inter) => {
   if (!inter.isChatInputCommand()) return;
-  const salonAutorisé = '1389691339599511684'; // Remplace par l’ID du salon autorisé
-if (inter.channelId !== salonAutorisé) {
-  return inter.reply({ content: '❌ Tu ne peux utiliser ce bot que dans le salon autorisé.', ephemeral: true });
-}
+
+  const salonAutorisé = '1389691339599511684';
+  if (inter.channelId !== salonAutorisé) {
+    return inter.reply({ content: '❌ Tu ne peux utiliser ce bot que dans le salon autorisé.', ephemeral: true });
+  }
+
   const uid = inter.user.id;
 
-  // ────────────────────────── PIERCHE2 ──────────────────────────
+  if (inter.commandName === 'dé2') {
+    const résultat = Math.floor(Math.random() * 6) + 1;
+    const gain = résultat * 2;
+
+    await pool.query(
+      `INSERT INTO koins(user_id, amount) VALUES ($1, $2)
+       ON CONFLICT(user_id) DO UPDATE SET amount = amount + $2`,
+      [uid, gain]
+    );
+
+    return inter.reply(`🎲 Tu as lancé le dé : **${résultat}** → Tu gagnes **${gain} koins** !`);
+  }
+
+  if (inter.commandName === 'bonus2') {
+    const now = Date.now(), wait = 24 * 60 * 60 * 1000;
+
+    try {
+      await inter.deferReply();
+      const { rows } = await pool.query('SELECT last_draw FROM pioches WHERE user_id=$1', [uid]);
+      const last = rows[0]?.last_draw ?? 0;
+
+      if (now - last < wait) {
+        const h = Math.ceil((wait - (now - last)) / (1000 * 60 * 60));
+        return inter.editReply(`🕒 Bonus déjà pris. Reviens dans ${h}h.`);
+      }
+
+      await pool.query(
+        `INSERT INTO koins(user_id, amount) VALUES ($1, 5)
+         ON CONFLICT(user_id) DO UPDATE SET amount = amount + 5`,
+        [uid]
+      );
+
+      await pool.query(
+        `INSERT INTO pioches(user_id, last_draw) VALUES ($1, $2)
+         ON CONFLICT(user_id) DO UPDATE SET last_draw = $2`,
+        [uid, now]
+      );
+
+      return inter.editReply(`🎁 Tu as reçu ton bonus quotidien : **5 koins** !`);
+
+    } catch (e) {
+      console.error(e);
+      return inter.editReply('❌ Erreur bonus2');
+    }
+  }
+
   if (inter.commandName === 'pioche2') {
     const now = Date.now(), wait = 90 * 60 * 1000;
     try {
@@ -76,17 +123,12 @@ if (inter.channelId !== salonAutorisé) {
         [uid, now]
       );
 
-      const embed = {
+      return inter.editReply({ embeds: [{
         title: `#${carte.id} • ${carte.name}`,
         description: `Tu as obtenu une nouvelle carte !`,
+        image: { url: carte.image },
         color: 0x3498db
-      };
-      return inter.editReply({ embeds: [embed], embeds: [{
-  title: `#${carte.id} • ${carte.name}`,
-  description: `Tu as obtenu une nouvelle carte !`,
-  image: { url: carte.image },
-  color: 0x3498db
-}] });
+      }] });
 
     } catch (e) {
       console.error(e);
@@ -94,57 +136,6 @@ if (inter.channelId !== salonAutorisé) {
     }
   }
 
-  // ────────────────────────── DE2 ──────────────────────────
-if (inter.commandName === 'dé2') {
-  const résultat = Math.floor(Math.random() * 6) + 1;
-  const gain = résultat * 2;
-
-  await pool.query(
-    `INSERT INTO koins(user_id, amount) VALUES ($1, $2)
-     ON CONFLICT(user_id) DO UPDATE SET amount = amount + $2`,
-    [uid, gain]
-  );
-
-  return inter.reply(`🎲 Tu as lancé le dé : **${résultat}** → Tu gagnes **${gain} koins** !`);
-}
-
-// ────────────────────────── BONUS2 ──────────────────────────
-if (inter.commandName === 'bonus2') {
-  const now = Date.now(), wait = 24 * 60 * 60 * 1000;
-
-  try {
-    await inter.deferReply();
-
-    const { rows } = await pool.query('SELECT last_draw FROM pioches WHERE user_id=$1', [uid]);
-    const last = rows[0]?.last_draw ?? 0;
-
-    if (now - last < wait) {
-      const h = Math.ceil((wait - (now - last)) / (1000 * 60 * 60));
-      return inter.editReply(`🕒 Bonus déjà pris. Reviens dans ${h}h.`);
-    }
-
-    await pool.query(
-      `INSERT INTO koins(user_id, amount) VALUES ($1, 5)
-       ON CONFLICT(user_id) DO UPDATE SET amount = amount + 5`,
-      [uid]
-    );
-
-    await pool.query(
-      `INSERT INTO pioches(user_id, last_draw) VALUES ($1, $2)
-       ON CONFLICT(user_id) DO UPDATE SET last_draw = $2`,
-      [uid, now]
-    );
-
-    return inter.editReply(`🎁 Tu as reçu ton bonus quotidien : **5 koins** !`);
-
-  } catch (e) {
-    console.error(e);
-    return inter.editReply('❌ Erreur bonus2');
-  }
-}
-
-
-  // ────────────────────────── BOOSTER2 ──────────────────────────
   if (inter.commandName === 'booster2') {
     try {
       await inter.deferReply();
@@ -167,17 +158,12 @@ if (inter.commandName === 'bonus2') {
       await inter.editReply('📦 Booster ouvert !');
 
       for (const carte of tirages) {
-        const embed = {
+        await inter.followUp({ embeds: [{
           title: `#${carte.id} • ${carte.name}`,
-          description: `Carte ajoutée à ta collection`,
+          description: `Tu as obtenu une nouvelle carte !`,
+          image: { url: carte.image },
           color: 0x3498db
-        };
-        await inter.followUp({ embeds: [embed], embeds: [{
-  title: `#${carte.id} • ${carte.name}`,
-  description: `Tu as obtenu une nouvelle carte !`,
-  image: { url: carte.image },
-  color: 0x3498db
-}] });
+        }] });
       }
     } catch (e) {
       console.error(e);
@@ -185,7 +171,6 @@ if (inter.commandName === 'bonus2') {
     }
   }
 
-  // ────────────────────────── KOLLEK2 ──────────────────────────
   if (inter.commandName === 'kollek2') {
     try {
       await inter.deferReply();
