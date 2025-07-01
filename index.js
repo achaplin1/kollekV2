@@ -49,6 +49,10 @@ client.once('ready', async () => {
 
 client.on('interactionCreate', async (inter) => {
   if (!inter.isChatInputCommand()) return;
+  const salonAutorisé = '1389691339599511684'; // Remplace par l’ID du salon autorisé
+if (inter.channelId !== salonAutorisé) {
+  return inter.reply({ content: '❌ Tu ne peux utiliser ce bot que dans le salon autorisé.', ephemeral: true });
+}
   const uid = inter.user.id;
 
   // ────────────────────────── PIERCHE2 ──────────────────────────
