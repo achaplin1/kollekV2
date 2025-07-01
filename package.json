@@ -6,10 +6,10 @@
     "prestart": "node syncCartes.js",
     "start": "node index.js"
   },
-  "dependencies": {
-    "discord.js": "^14.14.1",
-    "express": "^4.18.2",
-    "sqlite3": "^5.1.6",
-    "dotenv": "^16.0.0",
-  }
+"dependencies": {
+  "discord.js": "^14.14.1",
+  "express": "^4.18.2",
+  "sqlite3": "^5.1.6",
+  "dotenv": "^16.0.0"
+}
 }
