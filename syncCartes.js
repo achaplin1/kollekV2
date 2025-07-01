@@ -1,53 +1,45 @@
+const fs = require('fs');
+const path = require('path');
 
-import fs from 'fs';
-import path from 'path';
-
-const dossier = './cartes';
-const cheminJSON = './cartes.json';
-const extensionsValides = ['.png', '.jpg', '.jpeg', '.webp'];
-
-// Charger l’existant
+// ────── CHARGEMENT CARTES EXISTANTES ──────
+const cartesPath = './cartes.json';
 let cartes = [];
-if (fs.existsSync(cheminJSON)) {
-  cartes = JSON.parse(fs.readFileSync(cheminJSON, 'utf-8'));
+
+if (fs.existsSync(cartesPath)) {
+  cartes = JSON.parse(fs.readFileSync(cartesPath, 'utf8'));
 }
 
-// Créer une map pour éviter les doublons
-const nomsExistants = new Set(cartes.map(c => c.image));
+// ────── FICHIERS IMAGE ──────
+const dossierCartes = path.join(__dirname, 'cartes');
+if (!fs.existsSync(dossierCartes)) {
+  console.error('❌ Dossier cartes/ introuvable');
+  process.exit(1);
+}
 
-// Parcourir tous les fichiers valides
-const fichiers = fs.readdirSync(dossier).filter(f =>
-  extensionsValides.includes(path.extname(f).toLowerCase())
-);
+const fichiers = fs
+  .readdirSync(dossierCartes)
+  .filter(f => /\.(png|jpe?g|webp)$/i.test(f));
 
-let nouvellesCartes = 0;
+// ────── SYNCHRONISATION ──────
+let nouvelles = 0;
+
 for (const fichier of fichiers) {
-  const chemin = `/cartes/${fichier}`;
-  if (!nomsExistants.has(chemin)) {
-    const nomSansExt = path.parse(fichier).name;
-
+  const nom = path.parse(fichier).name;
+  const existe = cartes.find(c => c.name.toLowerCase() === nom.toLowerCase());
+  if (!existe) {
     cartes.push({
-      name: nomSansExt.charAt(0).toUpperCase() + nomSansExt.slice(1),
-      image: chemin,
+      id: cartes.length + 1,
+      name: nom.charAt(0).toUpperCase() + nom.slice(1),
+      image: `/cartes/${fichier}`
     });
-    nouvellesCartes++;
+    nouvelles++;
   }
 }
 
-// Sauvegarde
-if (nouvellesCartes > 0) {
-  fs.writeFileSync(cheminJSON, JSON.stringify(cartes, null, 2));
-  console.log(`✅ ${nouvellesCartes} carte(s) ajoutée(s) dans cartes.json`);
-} else {
-  console.log('✔️ Aucune nouvelle carte trouvée.');
-}
-import { execSync } from 'child_process';
+// ────── ÉCRITURE FICHIER ──────
+fs.writeFileSync(cartesPath, JSON.stringify(cartes, null, 2), 'utf8');
 
-try {
-  execSync('git add cartes.json cartes/*', { stdio: 'inherit' });
-  execSync('git commit -m "auto: ajout cartes"', { stdio: 'inherit' });
-  execSync('git push', { stdio: 'inherit' });
-  console.log('✅ cartes.json et images poussées sur GitHub');
-} catch (err) {
-  console.error('❌ Erreur push Git:', err.message);
-}
+if (nouvelles > 0)
+  console.log(`✅ ${nouvelles} carte(s) ajoutée(s) à cartes.json`);
+else
+  console.log('✔️ Aucune nouvelle carte trouvée.');
