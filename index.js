@@ -1,116 +1,147 @@
+// ────────────────────────── CONFIG ──────────────────────────
+require('dotenv').config();
+const {
+  Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder,
+  ActionRowBuilder, ButtonBuilder, ButtonStyle
+} = require('discord.js');
+const express = require('express');
+const { Pool } = require('pg');
+const path = require('path');
+const fs = require('fs');
 
-import { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } from 'discord.js';
-import sqlite3 from 'sqlite3';
-import fs from 'fs';
-import express from 'express';
+const app = express();
+const PORT = process.env.PORT || 3000;
+app.use('/cartes', express.static(path.join(__dirname, 'cartes')));
+app.listen(PORT, () => console.log(`✅ Express (static) sur ${PORT}`));
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+const cartes = JSON.parse(fs.readFileSync('./cartes.json', 'utf8'));
 
-const db = new sqlite3.Database('./database.db');
-
-// Création table si absente
-db.run(`
-  CREATE TABLE IF NOT EXISTS cartes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    image TEXT NOT NULL,
-    origin TEXT
-  )
-`);
-
-// Charger cartes depuis cartes.json
-const cartes = JSON.parse(fs.readFileSync('./cartes.json', 'utf-8'));
-for (const carte of cartes) {
-  db.get('SELECT * FROM cartes WHERE name = ?', [carte.name], (err, row) => {
-    if (!row) {
-      db.run('INSERT INTO cartes (name, image, origin) VALUES (?, ?, ?)',
-        [carte.name, carte.image, carte.origin]);
-    }
-  });
-}
-
-// ➕ Partie Express pour servir /cartes/
-const app = express();
-app.use('/cartes', express.static('cartes'));
-app.listen(process.env.PORT || 3000, () => {
-  console.log('✅ Serveur Express pour les images lancé');
-});
-
-const CLIENT_ID = '1389215821947080766';
-const baseURL = 'https://comfortable-abundance-production.up.railway.app';
+const commands = [
+  new SlashCommandBuilder().setName('pioche').setDescription('Tire une carte'),
+  new SlashCommandBuilder().setName('kollek').setDescription('Voir ta collection'),
+  new SlashCommandBuilder().setName('booster').setDescription('Booster de 3 cartes'),
+  new SlashCommandBuilder().setName('voir').setDescription('Voir une carte').addIntegerOption(opt =>
+    opt.setName('id').setDescription("ID de la carte").setRequired(true))
+].map(c => c.toJSON());
 
 client.once('ready', async () => {
-  console.log(`✅ Connecté en tant que ${client.user.tag}`);
+  console.log(`🤖 Connecté : ${client.user.tag}`);
+  const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+  const appId = (await rest.get(Routes.oauth2CurrentApplication())).id;
+  await rest.put(Routes.applicationCommands(appId), { body: commands });
+  console.log('✅ Slash commands enregistrées');
+  await pool.query(`CREATE TABLE IF NOT EXISTS collection(user_id TEXT, card_id INT);`);
+});
 
-  const commands = [
-    new SlashCommandBuilder().setName('booster2').setDescription('Ouvre 3 cartes'),
-    new SlashCommandBuilder().setName('pioche2').setDescription('Pioche une carte'),
-    new SlashCommandBuilder().setName('voir2').setDescription('Voir la carte id 1'),
-    new SlashCommandBuilder().setName('kollek2').setDescription('Voir toute la kollek')
-  ].map(cmd => cmd.toJSON());
+client.on('interactionCreate', async (inter) => {
+  if (!inter.isChatInputCommand()) return;
+  const uid = inter.user.id;
 
-  const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
-  try {
-    await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
-    console.log('✅ Commandes slash enregistrées');
-  } catch (err) {
-    console.error('❌ Erreur enregistrement slash:', err);
+  if (inter.commandName === 'pioche') {
+    await inter.deferReply();
+    const carte = cartes[Math.floor(Math.random() * cartes.length)];
+    await pool.query('INSERT INTO collection(user_id, card_id) VALUES ($1, $2)', [uid, carte.id]);
+    const embed = {
+      title: `#${carte.id} • ${carte.name}`,
+      description: `Tu as pioché une carte !`,
+      image: { url: carte.image },
+      color: 0x3498db
+    };
+    return inter.editReply({ embeds: [embed] });
+  }
+
+  if (inter.commandName === 'booster') {
+    await inter.deferReply();
+    const tirages = [];
+    for (let i = 0; i < 3; i++) {
+      const carte = cartes[Math.floor(Math.random() * cartes.length)];
+      await pool.query('INSERT INTO collection(user_id, card_id) VALUES ($1, $2)', [uid, carte.id]);
+      tirages.push(carte);
+    }
+    await inter.editReply('📦 Booster ouvert !');
+    for (const carte of tirages) {
+      const embed = {
+        title: `#${carte.id} • ${carte.name}`,
+        description: `Nouvelle carte !`,
+        image: { url: carte.image },
+        color: 0x3498db
+      };
+      await inter.followUp({ embeds: [embed] });
+    }
+  }
+
+  if (inter.commandName === 'kollek') {
+    await inter.deferReply();
+    const col = await pool.query('SELECT card_id FROM collection WHERE user_id=$1', [uid]);
+    if (!col.rowCount) return inter.editReply('😢 Aucune carte.');
+
+    const map = {};
+    col.rows.forEach(r => map[r.card_id] = (map[r.card_id] || 0) + 1);
+    const lignes = Object.entries(map).map(([id, n]) => {
+      const c = cartes.find(x => x.id === Number(id));
+      return `#${c.id} • **${c.name}** × ${n}`;
+    });
+
+    const embeds = [];
+    for (let i = 0; i < lignes.length; i += 10) {
+      embeds.push({
+        title: `📘 Kollek de ${inter.user.username} (${Math.floor(i / 10) + 1}/${Math.ceil(lignes.length / 10)})`,
+        description: lignes.slice(i, i + 10).join('\n'),
+        color: 0x3498db
+      });
+    }
+
+    if (embeds.length === 1) return inter.editReply({ embeds });
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('prev').setLabel('◀️').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('next').setLabel('▶️').setStyle(ButtonStyle.Secondary)
+    );
+    let page = 0;
+    const msg = await inter.editReply({ embeds: [embeds[0]], components: [row] });
+    const collector = msg.createMessageComponentCollector({ time: 60_000 });
+    collector.on('collect', async i => {
+      if (i.user.id !== uid) return i.reply({ content: "Pas ton menu !", ephemeral: true });
+      page = i.customId === 'next' ? (page + 1) % embeds.length : (page - 1 + embeds.length) % embeds.length;
+      await i.update({ embeds: [embeds[page]] });
+    });
+  }
+
+  if (inter.commandName === 'voir') {
+    await inter.deferReply();
+    const wantedId = inter.options.getInteger('id');
+    const col = await pool.query('SELECT card_id FROM collection WHERE user_id=$1', [uid]);
+    const owned = col.rows.map(r => Number(r.card_id));
+    const uniques = [...new Set(owned)];
+    if (!uniques.includes(wantedId)) return inter.editReply("❌ Tu n'as pas cette carte");
+
+    const sorted = uniques.sort((a, b) => a - b);
+    let index = sorted.indexOf(wantedId);
+    const sendEmbed = async () => {
+      const cardId = sorted[index];
+      const count = owned.filter(id => id === cardId).length;
+      const card = cartes.find(c => c.id === cardId);
+      return {
+        title: `#${card.id} • ${card.name}`,
+        description: `Quantité : **${count}**`,
+        image: { url: card.image },
+        color: 0x3498db,
+        footer: { text: `Carte ${index + 1} / ${sorted.length}` }
+      };
+    };
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('prev').setLabel('◀️').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId('next').setLabel('▶️').setStyle(ButtonStyle.Secondary)
+    );
+    const msg = await inter.editReply({ embeds: [await sendEmbed()], components: [row] });
+    const collector = msg.createMessageComponentCollector({ time: 60_000 });
+    collector.on('collect', async i => {
+      if (i.user.id !== uid) return i.reply({ content: "Pas ton menu !", ephemeral: true });
+      index = i.customId === 'next' ? (index + 1) % sorted.length : (index - 1 + sorted.length) % sorted.length;
+      await i.update({ embeds: [await sendEmbed()] });
+    });
   }
 });
 
-client.on('interactionCreate', async interaction => {
-  if (!interaction.isChatInputCommand()) return;
-
-  switch (interaction.commandName) {
-    case 'booster2': {
-      db.all('SELECT * FROM cartes ORDER BY RANDOM() LIMIT 3', async (err, rows) => {
-        for (const carte of rows) {
-          await interaction.followUp({
-            embeds: [{
-              title: carte.name,
-              description: carte.origin,
-              image: { url: baseURL + carte.image }
-            }]
-          });
-        }
-      });
-      break;
-    }
-
-    case 'pioche2': {
-      db.get('SELECT * FROM cartes ORDER BY RANDOM() LIMIT 1', async (err, carte) => {
-        await interaction.reply({
-          embeds: [{
-            title: carte.name,
-            description: carte.origin,
-            image: { url: baseURL + carte.image }
-          }]
-        });
-      });
-      break;
-    }
-
-    case 'voir2': {
-      db.get('SELECT * FROM cartes WHERE id = 1', async (err, carte) => {
-        await interaction.reply({
-          embeds: [{
-            title: carte.name,
-            description: carte.origin,
-            image: { url: baseURL + carte.image }
-          }]
-        });
-      });
-      break;
-    }
-
-    case 'kollek2': {
-      db.all('SELECT * FROM cartes', async (err, rows) => {
-        const message = rows.map(c => `• ${c.name} (${c.origin})`).join('\n');
-        await interaction.reply({ content: `🃏 Ta collection :\n${message}`.slice(0, 2000) });
-      });
-      break;
-    }
-  }
-});
-
-client.login(process.env.TOKEN);
+client.login(process.env.DISCORD_TOKEN);
