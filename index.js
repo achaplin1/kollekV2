@@ -75,7 +75,12 @@ client.on('interactionCreate', async (inter) => {
         description: `Tu as obtenu une nouvelle carte !`,
         color: 0x3498db
       };
-      return inter.editReply({ embeds: [embed], files: [carte.image] });
+      return inter.editReply({ embeds: [embed], embeds: [{
+  title: `#${carte.id} • ${carte.name}`,
+  description: `Tu as obtenu une nouvelle carte !`,
+  image: { url: carte.image },
+  color: 0x3498db
+}] });
 
     } catch (e) {
       console.error(e);
@@ -111,7 +116,12 @@ client.on('interactionCreate', async (inter) => {
           description: `Carte ajoutée à ta collection`,
           color: 0x3498db
         };
-        await inter.followUp({ embeds: [embed], files: [carte.image] });
+        await inter.followUp({ embeds: [embed], embeds: [{
+  title: `#${carte.id} • ${carte.name}`,
+  description: `Tu as obtenu une nouvelle carte !`,
+  image: { url: carte.image },
+  color: 0x3498db
+}] });
       }
     } catch (e) {
       console.error(e);
