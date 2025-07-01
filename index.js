@@ -41,6 +41,8 @@ client.once('ready', async () => {
   });
 
   await pool.query(`CREATE TABLE IF NOT EXISTS pioches  (user_id TEXT PRIMARY KEY, last_draw  BIGINT);`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS bonus    (user_id TEXT PRIMARY KEY, last_claim BIGINT);`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS rolls    (user_id TEXT PRIMARY KEY, last_roll  BIGINT);`);
   await pool.query(`CREATE TABLE IF NOT EXISTS koins    (user_id TEXT PRIMARY KEY, amount     INT    DEFAULT 0);`);
   await pool.query(`CREATE TABLE IF NOT EXISTS collection(user_id TEXT, card_id INT);`);
 
