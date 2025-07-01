@@ -52,12 +52,13 @@ client.once('ready', async () => {
 client.on('interactionCreate', async (inter) => {
   if (!inter.isChatInputCommand()) return;
 
-  const salonAutorisé = '1389691339599511684';
+  const salonAutorisé = inter.client.user.id === '1386427593581924412' ? '1389691339599511684' : '1386522327122055259';
   if (inter.channelId !== salonAutorisé) {
     return inter.reply({ content: '❌ Tu ne peux utiliser ce bot que dans le salon autorisé.', ephemeral: true });
   }
 
   const uid = inter.user.id;
+  const now = Date.now();
 
   if (inter.commandName === 'dé2') {
     const wait = 4 * 60 * 60 * 1000;
