@@ -32,6 +32,8 @@ client.once('ready', async () => {
   const appId = (await rest.get(Routes.oauth2CurrentApplication())).id;
   await rest.put(Routes.applicationCommands(appId), {
     body: [
+      new SlashCommandBuilder().setName('dé2').setDescription('Lance un dé à 6 faces (et gagne des koins)'),
+      new SlashCommandBuilder().setName('bonus2').setDescription('Réclame ton bonus quotidien (5 koins)')
       new SlashCommandBuilder().setName('pioche2').setDescription('Tire une carte (pas de rareté)'),
       new SlashCommandBuilder().setName('booster2').setDescription('Booster de 3 cartes (15 koins, sans pièces pour doublons)'),
       new SlashCommandBuilder().setName('kollek2').setDescription('Voir ta collection (v2 sans raretés)')
@@ -87,6 +89,56 @@ client.on('interactionCreate', async (inter) => {
       return inter.editReply('❌ Erreur pioche2');
     }
   }
+
+  // ────────────────────────── DE2 ──────────────────────────
+if (inter.commandName === 'dé2') {
+  const résultat = Math.floor(Math.random() * 6) + 1;
+  const gain = résultat * 2;
+
+  await pool.query(
+    `INSERT INTO koins(user_id, amount) VALUES ($1, $2)
+     ON CONFLICT(user_id) DO UPDATE SET amount = amount + $2`,
+    [uid, gain]
+  );
+
+  return inter.reply(`🎲 Tu as lancé le dé : **${résultat}** → Tu gagnes **${gain} koins** !`);
+}
+
+// ────────────────────────── BONUS2 ──────────────────────────
+if (inter.commandName === 'bonus2') {
+  const now = Date.now(), wait = 24 * 60 * 60 * 1000;
+
+  try {
+    await inter.deferReply();
+
+    const { rows } = await pool.query('SELECT last_draw FROM pioches WHERE user_id=$1', [uid]);
+    const last = rows[0]?.last_draw ?? 0;
+
+    if (now - last < wait) {
+      const h = Math.ceil((wait - (now - last)) / (1000 * 60 * 60));
+      return inter.editReply(`🕒 Bonus déjà pris. Reviens dans ${h}h.`);
+    }
+
+    await pool.query(
+      `INSERT INTO koins(user_id, amount) VALUES ($1, 5)
+       ON CONFLICT(user_id) DO UPDATE SET amount = amount + 5`,
+      [uid]
+    );
+
+    await pool.query(
+      `INSERT INTO pioches(user_id, last_draw) VALUES ($1, $2)
+       ON CONFLICT(user_id) DO UPDATE SET last_draw = $2`,
+      [uid, now]
+    );
+
+    return inter.editReply(`🎁 Tu as reçu ton bonus quotidien : **5 koins** !`);
+
+  } catch (e) {
+    console.error(e);
+    return inter.editReply('❌ Erreur bonus2');
+  }
+}
+
 
   // ────────────────────────── BOOSTER2 ──────────────────────────
   if (inter.commandName === 'booster2') {
