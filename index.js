@@ -58,49 +58,55 @@ client.on('interactionCreate', async (inter) => {
   const uid = inter.user.id;
 
   if (inter.commandName === 'dé2') {
-    const résultat = Math.floor(Math.random() * 6) + 1;
-    const gain = résultat * 2;
+    const wait = 4 * 60 * 60 * 1000;
+    const { rows } = await pool.query('SELECT last_roll FROM rolls WHERE user_id=$1', [uid]);
+    const last = rows[0]?.last_roll ?? 0;
+    if (now - last < wait) {
+      const m = Math.ceil((wait - (now - last)) / 60000);
+      return inter.reply(`⏳ Tu dois encore attendre ${m} min pour relancer le dé.`);
+    }
+
+    const roll = Math.floor(Math.random() * 6) + 1;
+    const gain = roll * 2;
 
     await pool.query(
       `INSERT INTO koins(user_id, amount) VALUES ($1, $2)
-       ON CONFLICT(user_id) DO UPDATE SET amount = amount + $2`,
+       ON CONFLICT(user_id) DO UPDATE SET amount = koins.amount + EXCLUDED.amount`,
       [uid, gain]
     );
 
-    return inter.reply(`🎲 Tu as lancé le dé : **${résultat}** → Tu gagnes **${gain} koins** !`);
+    await pool.query(
+      `INSERT INTO rolls(user_id, last_roll) VALUES ($1, $2)
+       ON CONFLICT(user_id) DO UPDATE SET last_roll = $2`,
+      [uid, now]
+    );
+
+    return inter.reply(`🎲 Tu as lancé un **${roll}** → Tu gagnes **${gain} koins** !`);
   }
 
   if (inter.commandName === 'bonus2') {
-    const now = Date.now(), wait = 24 * 60 * 60 * 1000;
+    const wait = 24 * 60 * 60 * 1000;
+    const { rows } = await pool.query('SELECT last_claim FROM bonus WHERE user_id=$1', [uid]);
+    const last = rows[0]?.last_claim ?? 0;
 
-    try {
-      await inter.deferReply();
-      const { rows } = await pool.query('SELECT last_draw FROM pioches WHERE user_id=$1', [uid]);
-      const last = rows[0]?.last_draw ?? 0;
-
-      if (now - last < wait) {
-        const h = Math.ceil((wait - (now - last)) / (1000 * 60 * 60));
-        return inter.editReply(`🕒 Bonus déjà pris. Reviens dans ${h}h.`);
-      }
-
-      await pool.query(
-        `INSERT INTO koins(user_id, amount) VALUES ($1, 5)
-         ON CONFLICT(user_id) DO UPDATE SET amount = amount + 5`,
-        [uid]
-      );
-
-      await pool.query(
-        `INSERT INTO pioches(user_id, last_draw) VALUES ($1, $2)
-         ON CONFLICT(user_id) DO UPDATE SET last_draw = $2`,
-        [uid, now]
-      );
-
-      return inter.editReply(`🎁 Tu as reçu ton bonus quotidien : **5 koins** !`);
-
-    } catch (e) {
-      console.error(e);
-      return inter.editReply('❌ Erreur bonus2');
+    if (now - last < wait) {
+      const h = Math.ceil((wait - (now - last)) / (1000 * 60 * 60));
+      return inter.reply(`🕒 Bonus déjà pris. Reviens dans ${h}h.`);
     }
+
+    await pool.query(
+      `INSERT INTO koins(user_id, amount) VALUES ($1, 5)
+       ON CONFLICT(user_id) DO UPDATE SET amount = koins.amount + EXCLUDED.amount`,
+      [uid]
+    );
+
+    await pool.query(
+      `INSERT INTO bonus(user_id, last_claim) VALUES ($1, $2)
+       ON CONFLICT(user_id) DO UPDATE SET last_claim = $2`,
+      [uid, now]
+    );
+
+    return inter.reply(`🎁 Tu as reçu ton bonus quotidien : **5 koins** !`);
   }
 
   if (inter.commandName === 'pioche2') {
